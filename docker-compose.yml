@@ -1,0 +1,123 @@
+version: "3.9"
+services:
+  zookeeper:
+    image: zookeeper:latest
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+    networks:
+      - bigdata_network
+
+  kafka:
+    image: bitnami/kafka:latest
+    container_name: kafka
+    environment:
+      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_CFG_BROKER_ID=1
+      - ALLOW_PLAINTEXT_LISTENER=yes
+    ports:
+      - "9092:9092"
+    depends_on:
+      - zookeeper
+    networks:
+      - bigdata_network
+
+  hadoop-namenode:
+    image: bde2020/hadoop-namenode:2.0.0-hadoop2.7.4-java8
+    container_name: namenode
+    environment:
+      - CLUSTER_NAME=hadoop_cluster
+    volumes:
+      - namenode_data:/hadoop/dfs/name
+    ports:
+      - "9870:9870"
+      - "9000:9000"
+    networks:
+      - bigdata_network
+
+  hadoop-datanode:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop2.7.4-java8
+    container_name: datanode
+    environment:
+      - CLUSTER_NAME=hadoop_cluster
+      - NAMENODE_HOST=namenode
+    volumes:
+      - datanode_data:/hadoop/dfs/data
+    depends_on:
+      - hadoop-namenode
+    ports:
+      - "9864:9864"
+    networks:
+      - bigdata_network
+
+  hbase:
+    image: bde2020/hbase-standalone:1.0.0-hbase1.2.6
+    container_name: hbase
+    environment:
+      HBASE_MANAGES_ZK: "false"
+    ports:
+      - "16010:16010"
+    depends_on:
+      - zookeeper
+      - hadoop-namenode
+      - hadoop-datanode
+    networks:
+      - bigdata_network
+
+  delta-spark:
+    image: deltaio/delta-docker:latest
+    container_name: delta-spark
+    ports:
+      - "4040:4040"
+    environment:
+      SPARK_MASTER: spark://delta-spark:7077
+      SPARK_WORKER_CORES: 2
+      SPARK_WORKER_MEMORY: 4g
+    volumes:
+      - ./scripts:/opt/spark/work-dir/scripts
+    networks:
+      - bigdata_network
+    depends_on:
+      - kafka
+      - hadoop-namenode
+
+  drill:
+    image: apache/drill:latest
+    container_name: drill
+    ports:
+      - "8047:8047"  # Drill Web UI
+      - "31010:31010" # Drill RPC port
+    environment:
+      DRILL_ZK: zookeeper:2181
+      DRILL_STORAGE_HDFS_URI: hdfs://namenode:8020
+      DRILL_STORAGE_HDFS_CONF_DIR: /etc/hadoop/conf
+    volumes:
+      - ./drill-setup:/opt/drill/setup
+    networks:
+      - bigdata_network
+    depends_on:
+      - zookeeper
+      - hadoop-namenode
+      
+  mongo:
+    image: mongo:latest
+    container_name: mongo
+    environment:
+      MONGO_INITDB_DATABASE: agri_data
+    ports:
+      - "27017:27017"
+    networks:
+      - bigdata_network
+
+networks:
+  bigdata_network:
+    driver: bridge
+
+volumes:
+  namenode_data:
+  datanode_data:
+  delta_data:
