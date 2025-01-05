@@ -1,0 +1,13 @@
+After Running the compose file, bash into kafka using:
+docker exec --workdir /opt/kafka/bin/ -it kafka sh
+
+Create a topic in kafka container using:
+./kafka-topics.sh --bootstrap-server localhost:9092 --topic agri-data --create --partitions 1 --replication-factor 1
+or delete using:
+./kafka-topics.sh --bootstrap-server localhost:9092 --topic test-topic --delete
+
+copy data from the container (/opt/kafka/bin) into the topic using:
+./kafka-console-producer.sh --broker-list localhost:9092 --topic agri-data < agriculture_data2.jsonl
+
+display the data store in the topic using:
+./kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic agri-data --from-beginning
