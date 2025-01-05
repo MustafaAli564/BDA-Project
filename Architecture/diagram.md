@@ -2,7 +2,7 @@
 graph TD
   subgraph BigData Ecosystem
     Zookeeper["<img src='https://cdn-icons-png.flaticon.com/512/1077/1077970.png' width=30 height=30><br>Zookeeper"]
-    Kafka["<img src='https://cdn-icons-png.flaticon.com/512/2281/2281186.png' width=30 height=30><br>Kafka"]
+    Kafka["<img src='https://svn.apache.org/repos/asf/kafka/site/logos/originals/png/ICON%20-%20White%20on%20Transparent.png' width=30 height=30><br>Kafka"]
     Namenode["<img src='https://cdn-icons-png.flaticon.com/512/744/744458.png' width=30 height=30><br>Hadoop Namenode"]
     Datanode["<img src='https://cdn-icons-png.flaticon.com/512/2933/2933997.png' width=30 height=30><br>Hadoop Datanode"]
     DeltaSpark["<img src='https://cdn-icons-png.flaticon.com/512/919/919825.png' width=30 height=30><br>Delta-Spark"]
