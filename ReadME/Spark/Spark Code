@@ -1,0 +1,107 @@
+Access spark shell using:
+spark-shell --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.1.2,org.mongodb.spark:mongo-spark-connector_2.12:3.0.1 --master local[*]
+
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.streaming.Trigger
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types._
+import com.mongodb.spark._
+
+val spark = SparkSession.builder.appName("KafkaSparkIntegration").getOrCreate()
+
+// Read data from Kafka
+val df = spark.readStream.format("kafka").option("kafka.bootstrap.servers", "kafka:9092").option("subscribe", "agri-data").option("startingOffsets", "earliest").load()
+
+val schema = StructType(Seq(
+    StructField("record_id", IntegerType, true),
+    StructField("location", StructType(Seq(
+        StructField("region", StringType, true),
+        StructField("latitude", DoubleType, true),
+        StructField("longitude", DoubleType, true)
+    )), true),
+    StructField("date", StringType, true),
+    StructField("soil", StructType(Seq(
+        StructField("ph_level", DoubleType, true),
+        StructField("moisture", DoubleType, true),
+        StructField("temperature", DoubleType, true),
+        StructField("organic_matter", DoubleType, true),
+        StructField("nutrients", StructType(Seq(
+            StructField("nitrogen", DoubleType, true),
+            StructField("phosphorus", DoubleType, true),
+            StructField("potassium", DoubleType, true)
+        )), true)
+    )), true),
+    StructField("weather", StructType(Seq(
+        StructField("temperature", DoubleType, true),
+        StructField("humidity", IntegerType, true),
+        StructField("rainfall", DoubleType, true),
+        StructField("wind_speed", DoubleType, true)
+    )), true),
+    StructField("crop", StructType(Seq(
+        StructField("type", StringType, true),
+        StructField("growth_stage", StringType, true),
+        StructField("yield_estimate", IntegerType, true),
+        StructField("disease_outbreak", BooleanType, true)
+    )), true)
+))
+
+val parsedDf = df.selectExpr("CAST(value AS STRING)").select(from_json(col("value"), schema).as("data")).select("data.*")
+
+val alerts = parsedDf.filter("crop.disease_outbreak = true"); 
+val query = alerts.writeStream.trigger(Trigger.ProcessingTime("10 seconds")).outputMode("append").format("console").start()
+
+query.stop()
+
+
+//Store data to mongodb
+val mongoUri = "mongodb://mongo:27017/agri_data"
+val database = "agri_data"
+val collection = "AGRI"
+val checkpointLocation = "checkpoint"
+
+def saveToMongoDB(batchDf: Dataset[Row], batchId: Long): Unit = {
+  val mongoClient = MongoClients.create(mongoUri)
+  val db = mongoClient.getDatabase(database)
+  val coll = db.getCollection(collection)
+
+  batchDf.collect().foreach { row =>
+    val doc = new Document()
+      .append("record_id", row.getAs[Int]("record_id"))
+      .append("location", new Document()
+        .append("region", row.getAs[Row]("location").getAs[String]("region"))
+        .append("latitude", row.getAs[Row]("location").getAs[Double]("latitude"))
+        .append("longitude", row.getAs[Row]("location").getAs[Double]("longitude"))
+      )
+      .append("date", row.getAs[String]("date"))
+      .append("soil", new Document()
+        .append("ph_level", row.getAs[Row]("soil").getAs[Double]("ph_level"))
+        .append("moisture", row.getAs[Row]("soil").getAs[Double]("moisture"))
+        .append("temperature", row.getAs[Row]("soil").getAs[Double]("temperature"))
+        .append("organic_matter", row.getAs[Row]("soil").getAs[Double]("organic_matter"))
+      )
+      .append("weather", new Document()
+        .append("temperature", row.getAs[Row]("weather").getAs[Double]("temperature"))
+        .append("humidity", row.getAs[Row]("weather").getAs[Int]("humidity"))
+        .append("rainfall", row.getAs[Row]("weather").getAs[Double]("rainfall"))
+        .append("wind_speed", row.getAs[Row]("weather").getAs[Double]("wind_speed"))
+      )
+      .append("crop", new Document()
+        .append("type", row.getAs[Row]("crop").getAs[String]("type"))
+        .append("growth_stage", row.getAs[Row]("crop").getAs[String]("growth_stage"))
+        .append("yield_estimate", row.getAs[Row]("crop").getAs[Int]("yield_estimate"))
+        .append("disease_outbreak", row.getAs[Row]("crop").getAs[Boolean]("disease_outbreak"))
+      )
+
+    coll.insertOne(doc)
+  }
+
+  // Close MongoDB connection
+  mongoClient.close()
+}
+
+
+
+val query = parsedDf.writeStream.foreachBatch { (batchDf: Dataset[Row], batchId: Long) => saveToMongoDB(batchDf, batchId)}.trigger(Trigger.ProcessingTime("10 seconds")).outputMode("append").option("checkpointLocation", checkpointLocation).start()
+
+query.awaitTermination()
