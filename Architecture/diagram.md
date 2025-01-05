@@ -9,12 +9,14 @@ graph TD
     Drill["<img src='https://cdn-icons-png.flaticon.com/512/917/917707.png' width=30 height=30><br>Apache Drill"]
     Mongo["<img src='https://cdn-icons-png.flaticon.com/512/2523/2523644.png' width=30 height=30><br>MongoDB"]
 
-    Zookeeper --> Kafka
-    Kafka --> DeltaSpark
+    Zookeeper --> |Coordinate Brokers| Kafka
+    Kafka --> |Stream Data| DeltaSpark
     Namenode -->|Stores Metadata| Datanode
     DeltaSpark -->|Reads/Writes Data| Namenode
     DeltaSpark -->|Processes Data| Kafka
     Drill -->|Queries| Namenode
     Drill -->|Coordinates| Zookeeper
-    Mongo --> DeltaSpark
+    Mongo --> |Spark reads/writes data to mongo| DeltaSpark
+    Zookeeper --> |Zookeeper manages namenode coordination| Namenode
+    Drill --> |Drill queries data from mongo| Mongo
   end
