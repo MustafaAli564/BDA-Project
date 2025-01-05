@@ -1,0 +1,13 @@
+Bash into mongo container:
+docker exec -it mongodb mongosh
+
+Create new database and add a dummy collection to persist:
+use agriculture_data
+db.dummyCollection.insertOne({key:"value"})
+
+Once data is stored into mongo from spark shell, use this to show the data:
+db.AGRI.find({})
+
+Extract the data from the collection into a JSON file that would be used for visualization:
+docker exec -it mongo bash
+mongoexport --host localhost --port 27017 --db agri_data --collection AGRI --out /data/AGRI.json
