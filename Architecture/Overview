@@ -1,0 +1,69 @@
+The setup consists of multiple services deployed in a single network (bigdata_network) to enable seamless communication. Below is a high-level description of the components and their relationships:
+
+1. Zookeeper
+Purpose: Provides coordination and service discovery for distributed systems.
+Ports: Exposes port 2181 for client connections.
+Role: Serves as a dependency for Kafka and Drill, ensuring distributed consensus.
+
+2. Kafka
+Purpose: A distributed event streaming platform for message brokering.
+Configuration:
+Connects to Zookeeper (zookeeper:2181) for coordination.
+Uses PLAINTEXT communication mode.
+Ports: Exposes port 9092 for producer and consumer communication.
+Depends On: Zookeeper for its operation.
+Role: Provides a messaging layer for big data pipelines.
+
+3. Hadoop Cluster
+Components:
+Hadoop Namenode:
+Purpose: Manages metadata for the Hadoop Distributed File System (HDFS).
+Ports:
+9870: Web UI for HDFS.
+9000: RPC for file system operations.
+Volumes: Stores namenode metadata in namenode_data.
+Role: Central point for HDFS.
+Hadoop Datanode:
+Purpose: Stores the actual data blocks for HDFS.
+Ports:
+9864: Web UI for the datanode.
+Volumes: Stores data blocks in datanode_data.
+Depends On: Namenode for operation.
+Role: Provides distributed storage for big data.
+
+4. Delta-Spark
+Purpose: Provides an Apache Spark runtime with Delta Lake capabilities.
+Configuration:
+Configured with 2 cores and 4GB of memory for Spark workers.
+Runs in standalone mode (spark://delta-spark:7077).
+Includes a custom scripts directory mounted at /opt/spark/work-dir/scripts.
+Ports: Exposes port 4040 for Spark UI.
+Depends On:
+Kafka: Likely used as a source or sink for Spark data processing.
+Hadoop Namenode: Accesses HDFS for reading/writing Delta tables.
+Role: Executes distributed data processing and manages Delta Lake transactions.
+
+5. Apache Drill
+Purpose: Distributed SQL query engine for querying structured and semi-structured data.
+Configuration:
+Connects to Zookeeper (zookeeper:2181) for coordination.
+Uses HDFS (hdfs://namenode:8020) as a storage backend.
+Configuration files mounted from the host at /opt/drill/setup.
+Ports:
+8047: Web UI for Drill.
+31010: RPC port for Drill queries.
+Depends On:
+Zookeeper for coordination.
+Hadoop Namenode for HDFS storage.
+Role: Enables SQL-based querying on HDFS and other data sources.
+
+6. MongoDB
+Purpose: A NoSQL database for storing semi-structured or unstructured data.
+Configuration:
+Initializes a database named agri_data.
+Ports: Exposes port 27017 for database connections.
+Role: Acts as a data source or sink for applications needing document-oriented storage.
+
+
+Networking
+All services communicate via a single bridge network (bigdata_network), ensuring isolation and interconnectivity.
